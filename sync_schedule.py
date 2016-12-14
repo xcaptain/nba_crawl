@@ -1,5 +1,6 @@
 import requests
 import pandas as pd
+from nba_py import game
 import yaml
 import json
 from sqlalchemy import create_engine
@@ -17,13 +18,21 @@ class ScheduleSyncer:
         dsn = "mysql+pymysql://"+user+":"+passwd+"@"+host+"/"+db
         engine = create_engine(dsn, encoding='utf8', echo=True)
         self.conn = engine.connect()
+        self.df = None
 
     def sync_all(self):
         text = self.get_schedule_text()
-        df = pd.read_json(text)
-        print(df.loc[0])
+        self.df = pd.read_json(text)
+        self.sync_summary()
+        self.sync_detail()
 
-        df.to_sql('matches', self.conn, if_exists='replace')
+    def sync_summary(self):
+        self.df.to_sql('matches', self.conn, if_exists='replace')
+
+    def sync_detail(self):
+        for gid in self.df.loc[:,'gid']:
+            gid = '{0:010d}'.format(gid)
+            game.Boxscore(gid).team_stats().to_sql('match_detail', self.conn, if_exists='append')
 
     def get_schedule_text(self):
         r = requests.get(self.url).text
