@@ -19,16 +19,17 @@ class PlayerCareerSyncer:
     def sync_all(self):
         all_player_id = player.PlayerList().info().loc[:,'PERSON_ID']
         for player_id in all_player_id:
-            # self.sync_one(player_id)
-            # self.sync_user_profile(player_id)
-            self.sync_summary(player_id)
+            self.sync_one(player_id)
 
     def sync_one(self, player_id):
-        player.PlayerCareer(player_id).regular_season_totals().to_sql('player_career_regular_season', self.conn, if_exists='append')
-        # player.PlayerGameLogs(player_id=player_id).info().to_sql('player_game_logs', self.conn, if_exists='append')
+        self.sync_summary(player_id)
+        self.sync_career(player_id)
 
     def sync_summary(self, player_id):
         player.PlayerSummary(player_id).info().to_sql('player_summary', self.conn, if_exists='append')
+
+    def sync_career(self, player_id):
+        player.PlayerCareer(player_id).regular_season_totals().to_sql('player_career_regular_season', self.conn, if_exists='append')
 
     def sync_user_profile(self, player_id):
         player.PlayerProfile(player_id).career_highs().to_sql('player_profiles', self.conn, if_exists='append')
