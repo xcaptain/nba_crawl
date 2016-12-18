@@ -4,9 +4,11 @@ from nba_py import game
 import yaml
 import json
 from sqlalchemy import create_engine
+from sqlalchemy import text
 
 with open("config.yml", 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
+
 
 class ScheduleSyncer:
     def __init__(self):
@@ -15,8 +17,10 @@ class ScheduleSyncer:
         user = cfg['mysql']['user']
         passwd = cfg['mysql']['passwd']
         db = cfg['mysql']['db']
-        dsn = "mysql+pymysql://"+user+":"+passwd+"@"+host+"/"+db
+        dsn = "mysql+pymysql://" + user + ":" + passwd + "@" + host + "/" + db
         engine = create_engine(dsn, encoding='utf8', echo=True)
+        engine.execute(text('DROP TABLE IF EXISTS matches;'))
+        engine.execute(text('DROP TABLE IF EXISTS match_detail;'))
         self.conn = engine.connect()
         self.df = None
 
@@ -30,9 +34,10 @@ class ScheduleSyncer:
         self.df.to_sql('matches', self.conn, if_exists='replace')
 
     def sync_detail(self):
-        for gid in self.df.loc[:,'gid']:
+        for gid in self.df.loc[:, 'gid']:
             gid = '{0:010d}'.format(gid)
-            game.Boxscore(gid).team_stats().to_sql('match_detail', self.conn, if_exists='append')
+            game.Boxscore(gid).team_stats().to_sql(
+                'match_detail', self.conn, if_exists='append')
 
     def get_schedule_text(self):
         r = requests.get(self.url).text
@@ -63,6 +68,7 @@ class ScheduleSyncer:
 
         j = json.dumps(l)
         return j
+
 
 if __name__ == '__main__':
     o = ScheduleSyncer()
