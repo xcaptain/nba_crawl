@@ -65,7 +65,8 @@ class PlayerCareerSyncer:
             info = {
                 'PERSON_ID': player_id,
                 'CHINESE_POSITION': profile['position'],
-                'CHINESE_NAME': profile['displayName']
+                'CHINESE_NAME': profile['displayName'],
+                'CHINESE_COUNTRY': profile['country'],
             }
             m[player_id] = info
         return m
