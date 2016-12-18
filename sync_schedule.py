@@ -5,6 +5,7 @@ import yaml
 import json
 from sqlalchemy import create_engine
 from sqlalchemy import text
+import time
 
 with open("config.yml", 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
@@ -25,21 +26,26 @@ class ScheduleSyncer:
         self.df = None
 
     def sync_all(self):
-        text = self.get_schedule_text()
-        self.df = pd.read_json(text)
+        self.schedule_list = self.get_schedule_list()
         self.sync_summary()
         self.sync_detail()
 
     def sync_summary(self):
-        self.df.to_sql('matches', self.conn, if_exists='replace')
+        df = pd.read_json(json.dumps(self.schedule_list))
+        df.to_sql('matches', self.conn, if_exists='replace')
 
     def sync_detail(self):
-        for gid in self.df.loc[:, 'gid']:
-            gid = '{0:010d}'.format(gid)
+        for item in self.schedule_list:
+            gdate = item.get('gdte')
+            t1 = time.strptime(gdate, '%Y-%m-%d')  # east time
+            t2 = time.localtime()  # current time
+            if t1 > t2:  # avoid overwhelming
+                break
+            gid = '{0:010d}'.format(int(item.get('gid')))
             game.Boxscore(gid).team_stats().to_sql(
                 'match_detail', self.conn, if_exists='append')
 
-    def get_schedule_text(self):
+    def get_schedule_list(self):
         r = requests.get(self.url).text
         d = json.loads(r)
         l = []
@@ -66,8 +72,7 @@ class ScheduleSyncer:
                     item2.pop('ptsls')
                 l.append(item2)
 
-        j = json.dumps(l)
-        return j
+        return l
 
 
 if __name__ == '__main__':
