@@ -27,10 +27,10 @@ class PlayerCareerSyncer:
         self.conn = engine.connect()
 
     def sync_all(self):
-
         all_player_id = player.PlayerList().info().loc[:, 'PERSON_ID']
         for player_id in all_player_id:
             self.sync_one(player_id)
+        self.sync_game_log()
 
     def sync_one(self, player_id):
         self.sync_summary(player_id)
@@ -38,9 +38,10 @@ class PlayerCareerSyncer:
 
     def sync_summary(self, player_id):
         summary = player.PlayerSummary(player_id).info()
-        translation = self.player_translations.get(player_id)
-        summary.loc[:, 'CHINESE_NAME'] = translation['CHINESE_NAME']
-        summary.loc[:, 'CHINESE_POSITION'] = translation['CHINESE_POSITION']
+        translation = self.player_translations.get(player_id, '')
+        if translation:
+            summary.loc[:, 'CHINESE_NAME'] = translation['CHINESE_NAME']
+            summary.loc[:, 'CHINESE_POSITION'] = translation['CHINESE_POSITION']
         summary.to_sql('player_summary', self.conn, if_exists='append')
 
     def sync_career(self, player_id):
@@ -51,9 +52,9 @@ class PlayerCareerSyncer:
         player.PlayerProfile(player_id).career_highs().to_sql(
             'player_profiles', self.conn, if_exists='append')
 
-    def sync_schedule(self):
+    def sync_game_log(self):
         league.GameLog().overall().to_sql(
-            'league_game_logs', self.conn, if_exists='append')
+            'league_game_logs', self.conn, if_exists='replace')
 
     def get_player_translation(self):
         url = 'http://china.nba.com/static/data/league/playerlist.json'
@@ -75,5 +76,6 @@ class PlayerCareerSyncer:
 if __name__ == '__main__':
     o = PlayerCareerSyncer()
     o.sync_all()
+    # o.sync_game_log()
     # o.sync_schedule()
     # o.sync_summary(1713)
