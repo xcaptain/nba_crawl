@@ -42,6 +42,7 @@ class PlayerCareerSyncer:
         if translation:
             summary.loc[:, 'CHINESE_NAME'] = translation['CHINESE_NAME']
             summary.loc[:, 'CHINESE_POSITION'] = translation['CHINESE_POSITION']
+            summary.loc[:, 'CHINESE_COUNTRY'] = translation['CHINESE_COUNTRY']
         summary.to_sql('player_summary', self.conn, if_exists='append')
 
     def sync_career(self, player_id):
