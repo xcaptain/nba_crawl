@@ -6,6 +6,7 @@ import json
 from sqlalchemy import create_engine
 from sqlalchemy import text
 import time
+import datetime
 import os
 
 with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'config.yml'), 'r') as ymlfile:
@@ -20,22 +21,30 @@ class ScheduleSyncer:
         passwd = cfg['mysql']['passwd']
         db = cfg['mysql']['db']
         dsn = "mysql+pymysql://" + user + ":" + passwd + "@" + host + "/" + db
-        engine = create_engine(dsn, encoding='utf8', echo=True)
-        engine.execute(text('DROP TABLE IF EXISTS matches;'))
-        engine.execute(text('DROP TABLE IF EXISTS match_detail;'))
-        self.conn = engine.connect()
+        self.engine = create_engine(dsn, encoding='utf8', echo=True)
+        self.conn = self.engine.connect()
         self.df = None
 
     def sync_all(self):
+        '''全量更新'''
+        self.engine.execute(text('DROP TABLE IF EXISTS matches;'))
+        self.engine.execute(text('DROP TABLE IF EXISTS match_detail;'))
         self.schedule_list = self.get_schedule_list()
         self.sync_summary()
-        self.sync_detail()
+        self.sync_detail_all()
+
+    def sync_incremental(self):
+        '''增量更新'''
+        self.engine.execute(text('DROP TABLE IF EXISTS matches;'))
+        self.schedule_list = self.get_schedule_list()
+        self.sync_summary()
+        self.sync_detail_incremental()
 
     def sync_summary(self):
         df = pd.read_json(json.dumps(self.schedule_list))
         df.to_sql('matches', self.conn, if_exists='replace')
 
-    def sync_detail(self):
+    def sync_detail_all(self):
         for item in self.schedule_list:
             gdate = item.get('gdte')
             t1 = time.strptime(gdate, '%Y-%m-%d')  # east time
@@ -45,6 +54,19 @@ class ScheduleSyncer:
             gid = '{0:010d}'.format(int(item.get('gid')))
             game.Boxscore(gid).team_stats().to_sql(
                 'match_detail', self.conn, if_exists='append')
+
+    def sync_detail_incremental(self):
+        gids = []
+        for item in self.schedule_list:
+            gdate = item.get('gdte')
+            t1 = datetime.datetime.now() - datetime.timedelta(7) # 增加备份时间
+            t2 = datetime.datetime.strptime(gdate, '%Y-%m-%d')
+            t3 = datetime.datetime.now() + datetime.timedelta(1) # 北京时间比西方时间早
+            if t1 < t2 and t2 < t3:
+                gid = '{0:010d}'.format(int(item.get('gid')))
+                gids.append(gid)
+        for gid in gids:
+            game.Boxscore(gid).team_stats().to_sql('match_detail', self.conn, if_exists='append')
 
     def get_schedule_list(self):
         r = requests.get(self.url).text
@@ -78,4 +100,5 @@ class ScheduleSyncer:
 
 if __name__ == '__main__':
     o = ScheduleSyncer()
-    o.sync_all()
+    o.sync_incremental()
+    # o.sync_all()
