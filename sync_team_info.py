@@ -4,8 +4,9 @@ from sqlalchemy import create_engine
 from sqlalchemy import text
 import json
 import requests
+import os
 
-with open("config.yml", 'r') as ymlfile:
+with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'config.yml'), 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
 
 
